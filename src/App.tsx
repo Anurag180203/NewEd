@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   BookOpen, 
   Users, 
@@ -17,10 +17,145 @@ import {
   Zap,
   Target
 } from 'lucide-react';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+
+const LoginSignupModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [googleUser, setGoogleUser] = useState<any>(null);
+  const googleDivRef = useRef<HTMLDivElement>(null);
+
+  const handleGoogleSuccess = (credentialResponse: any) => {
+    const decodeJWT = (token: string) => {
+      let base64Url = token.split('.')[1];
+      let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      let jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map(function (c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          })
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    };
+    if (credentialResponse.credential) {
+      setGoogleUser(decodeJWT(credentialResponse.credential));
+    }
+  };
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative">
+        <button
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-700"
+          onClick={onClose}
+        >
+          <X className="w-6 h-6" />
+        </button>
+        <div className="mb-6 flex justify-center gap-4">
+          <button
+            className={`px-4 py-2 rounded-full font-medium ${mode === 'login' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+            onClick={() => setMode('login')}
+          >
+            Login
+          </button>
+          <button
+            className={`px-4 py-2 rounded-full font-medium ${mode === 'signup' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+            onClick={() => setMode('signup')}
+          >
+            Sign Up
+          </button>
+        </div>
+        {googleUser ? (
+          <div className="text-center mb-4">
+            <img src={googleUser.picture} alt="Profile" className="w-16 h-16 rounded-full mx-auto mb-2" />
+            <div className="font-bold text-lg">Welcome, {googleUser.name}!</div>
+            <div className="text-gray-600 text-sm mb-2">{googleUser.email}</div>
+            <button className="mt-2 text-blue-600 underline" onClick={() => setGoogleUser(null)}>Logout</button>
+          </div>
+        ) : (
+          <>
+            <div ref={googleDivRef} className="flex justify-center mb-4" />
+            <div className="flex items-center mb-4">
+              <div className="flex-grow border-t border-gray-200" />
+              <span className="mx-2 text-gray-400 text-xs">or</span>
+              <div className="flex-grow border-t border-gray-200" />
+            </div>
+            {mode === 'login' ? (
+              <form className="space-y-4">
+                <div>
+                  <label className="block text-gray-700 mb-1">Email</label>
+                  <input type="email" className="w-full border rounded-lg px-3 py-2" placeholder="Enter your email" />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-1">Password</label>
+                  <input type="password" className="w-full border rounded-lg px-3 py-2" placeholder="Enter your password" />
+                </div>
+                <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium mt-2">Login</button>
+              </form>
+            ) : (
+              <form className="space-y-4">
+                <div>
+                  <label className="block text-gray-700 mb-1">Name</label>
+                  <input type="text" className="w-full border rounded-lg px-3 py-2" placeholder="Enter your name" />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-1">Email</label>
+                  <input type="email" className="w-full border rounded-lg px-3 py-2" placeholder="Enter your email" />
+                </div>
+                <div>
+                  <label className="block text-gray-700 mb-1">Password</label>
+                  <input type="password" className="w-full border rounded-lg px-3 py-2" placeholder="Create a password" />
+                </div>
+                <button type="submit" className="w-full bg-purple-600 text-white py-2 rounded-lg font-medium mt-2">Sign Up</button>
+              </form>
+            )}
+            {!googleUser && (
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => console.log('Login Failed')}
+                width="100%"
+              />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any, info: any) {
+    // You can log error here
+  }
+  resetError = () => {
+    this.setState({ hasError: false });
+  };
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-center">
+          <div className="text-red-600 font-bold mb-4">Something went wrong.</div>
+          <button className="bg-blue-600 text-white px-4 py-2 rounded" onClick={this.resetError}>Try Again</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
+  const [showLoginSignup, setShowLoginSignup] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -171,8 +306,17 @@ function App() {
                   {item.label}
                 </button>
               ))}
-              <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full text-sm font-medium hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-                Get Started
+              <button
+                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full text-sm font-medium hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                onClick={() => setShowLoginSignup(true)}
+              >
+                Login
+              </button>
+              <button
+                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-full text-sm font-medium hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                onClick={() => setShowLoginSignup(true)}
+              >
+                Sign Up
               </button>
             </div>
 
@@ -205,8 +349,17 @@ function App() {
                     {item.label}
                   </button>
                 ))}
-                <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full text-sm font-medium w-fit">
-                  Get Started
+                <button
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full text-sm font-medium w-fit"
+                  onClick={() => setShowLoginSignup(true)}
+                >
+                  Login
+                </button>
+                <button
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-full text-sm font-medium w-fit"
+                  onClick={() => setShowLoginSignup(true)}
+                >
+                  Sign Up
                 </button>
               </div>
             </div>
@@ -539,6 +692,10 @@ function App() {
           </div>
         </div>
       </footer>
+
+      <ErrorBoundary>
+        <LoginSignupModal open={showLoginSignup} onClose={() => setShowLoginSignup(false)} />
+      </ErrorBoundary>
     </div>
   );
 }
